@@ -66,6 +66,7 @@ class CatanBoard:
             ring_coords = self._gen_ring(ring)
             if self.randomize_ring_placement == True:
                 random.shuffle(ring_coords)
+            ring_coords.sort(key=lambda x : x[0] == 0 or x[1] == 0 or x[2] == 0)
             hex_coords += ring_coords
         return hex_coords
     
@@ -148,7 +149,7 @@ class CatanBoard:
         for i in range(n_tiles):
             tiles[i].set_coordinate(*hex_coords[i])
         
-            
+        self.tiles = tiles
         return tiles
     
     def plot(self):

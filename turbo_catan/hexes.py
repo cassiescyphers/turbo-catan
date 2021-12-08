@@ -8,10 +8,13 @@ class Tile:
     def __init__(self,type,num=None,r=None,q=None,s=None):
         self.type = type
         self.num = num
+        self.r = None
+        self.q = None
+        self.s = None
         
         if r != None and q != None and s != None:
-            self.set_coordinate(r,q,s)
-    def set_coordinate(self,r,q,s):
+            self.set_coordinate(q,r,s)
+    def set_coordinate(self,q,r,s):
         self.r = r
         self.q = q
         self.s = s
@@ -20,6 +23,8 @@ class Tile:
                 raise Exception("Invalid coordinate...")
         except:
             raise Exception("Invalid coordinate...")
+    def get_coordinates(self):
+        return self.q,self.r,self.s
 
 class TileType(enum.Enum):
     wood = 1
