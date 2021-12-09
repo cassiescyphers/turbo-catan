@@ -5,7 +5,7 @@ import numpy as np
 import enum
 
 class Tile:
-    def __init__(self,type,num=None,r=None,q=None,s=None):
+    def __init__(self,type,num=None,q=None,r=None,s=None):
         self.type = type
         self.num = num
         self.r = None
@@ -25,6 +25,8 @@ class Tile:
             raise Exception("Invalid coordinate...")
     def get_coordinates(self):
         return self.q,self.r,self.s
+    def __repr__(self):
+        return str(self.type) + " tile @ " + str(self.get_coordinates())
 
 class TileType(enum.Enum):
     wood = 1
@@ -56,7 +58,7 @@ class TileType(enum.Enum):
             ans = "gold"
 
         else:
-            raise Exception("I am overburdened.")
+            raise Exception("I am overburdened: " + str(self))
 
         return ans
 ALL_TILE_TYPES = [TileType.wood,TileType.wheat,TileType.sheep,TileType.ore,TileType.brick,TileType.gold,TileType.desert,TileType.ocean]  

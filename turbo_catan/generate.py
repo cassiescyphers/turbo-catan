@@ -3,6 +3,7 @@
 import numpy as np
 from hexes import *
 import random
+import math
 
 class CatanBoard:
     def __init__(self,n_players,enable_bonus_rolls=True):
@@ -46,6 +47,7 @@ class CatanBoard:
             
         # tile placement config
         self.randomize_ring_placement = True
+        self.prevent_single_edge_outer_ring_tiles = True
         
     def _gen_ring(self,ring):
         '''Generates the coordinates of the specified ring number of tiles.'''
@@ -59,16 +61,49 @@ class CatanBoard:
                 if max(Q,R,S) == ring:
                     hex_coords.append((q,r,s))
         return hex_coords
-    def _gen_coords(self,max_ring = 2):
-        '''Generates coordinates for multiple rings, up to the specified max_ring and returns the list of tuples. Coordinate tuples are in Q,R,S format'''
-        hex_coords = []
-        for ring in range(max_ring+1):
-            ring_coords = self._gen_ring(ring)
+    def _calc_n_rings_needed(self,n_tiles):
+        return math.ceil((-3 + math.sqrt(12*n_tiles - 3)) / 6) + 1
+    
+    def _gen_tile_templates(self,n_tiles):
+        '''Generates a template board
+        
+            returns: template_hexes,outer_water_hexes
+        '''            
+        template_hexes = []
+        
+        n_rings_needed = self._calc_n_rings_needed(n_tiles)
+        
+        for i_ring in range(n_rings_needed):
+            
+            ring_coords = self._gen_ring(i_ring)
+            
             if self.randomize_ring_placement == True:
                 random.shuffle(ring_coords)
-            ring_coords.sort(key=lambda x : x[0] == 0 or x[1] == 0 or x[2] == 0)
-            hex_coords += ring_coords
-        return hex_coords
+            if self.prevent_single_edge_outer_ring_tiles == True:
+                ring_coords.sort(key=lambda x : x[0] == 0 or x[1] == 0 or x[2] == 0)
+            
+            
+            
+            
+            if i_ring < (n_rings_needed - 1):
+                allowed_tiles = ALL_TILE_TYPES
+            else:
+                ntake = n_tiles-len(template_hexes)
+                
+                outer_water_hexes = []
+                for coord in ring_coords[ntake:]:
+                    outer_water_hexes.append(Tile(TileType.ocean,None,*coord))
+
+                ring_coords = ring_coords[:ntake]
+
+                allowed_tiles = ALL_TILE_TYPES#RESOURCE_TILE_TYPES
+            
+            for ring_coord in ring_coords:
+                template_hex = TileTemplate(*ring_coord,allowed_tiles)
+                template_hexes.append(template_hex)
+                
+        
+        return template_hexes,outer_water_hexes
     
     def _gen_bag_of_rtiles(self,n_resource_tiles):
         '''Create the bag of roll tiles to choose from'''
@@ -128,7 +163,7 @@ class CatanBoard:
         n_each_resource =  int(np.ceil(n_players*self.resource_tiles_per_player) / len(RESOURCE_TILE_TYPES))
         n_resource_tiles = int(n_each_resource) * len(RESOURCE_TILE_TYPES)
         n_non_resource = int(n_players*self.total_tiles_per_player - n_resource_tiles)
-        
+
         bag_of_rtiles = self._gen_bag_of_rtiles(n_resource_tiles)
         
         
@@ -141,14 +176,46 @@ class CatanBoard:
             res = np.random.choice(non_resource_tile_types,p=non_resource_tile_probs)
             tiles.append(Tile(res))
             
-        random.shuffle(tiles)
         n_tiles = len(tiles)
+
+        template_hexes,outer_ocean_hexes = self._gen_tile_templates(n_tiles)
         
-        hex_coords = self._gen_coords(8)[:n_tiles];
+        # find the tiles that we need to place that have the least number of viable locations
+        placement_results = []
+        for tile_type in ALL_TILE_TYPES:
+            viable_placements = [x for x in template_hexes if tile_type in x.allowed_types]
+            n = len(viable_placements)
+            
+            placement_results.append((n,tile_type))
+
+        placement_results.sort(key=lambda x : x[0])
+           
         
-        for i in range(n_tiles):
-            tiles[i].set_coordinate(*hex_coords[i])
+        while(True): # attempt placement
+            coordinate_assignments = {}
+            n_placed = 0
+            template_hexes_copy = template_hexes.copy()
+            for n,tile_type in placement_results:
+                
+                viable_placements = [x for x in template_hexes_copy if tile_type in x.allowed_types]
+                for tile in [x for x in tiles if x.type == tile_type]:
+                    choice = np.random.choice(viable_placements)
+                    coordinate_assignments[tile] = choice
+                    viable_placements.remove(choice)
+                    template_hexes_copy.remove(choice)
+                    n_placed += 1
+
+            if n_placed == n_tiles:
+                break
+            else:
+                raise Exception("something broke." + str(n_placed ) + " " + str(n_tiles))
         
+        
+        for tile in tiles:
+            c = coordinate_assignments[tile]
+            tile.set_coordinate(c.q,c.r,c.s)
+        tiles += outer_ocean_hexes
+
         self.tiles = tiles
         return tiles
     
@@ -156,3 +223,14 @@ class CatanBoard:
         fig,ax = plot_hexes(self.tiles)
         ax.set_title(str(self.n_players) + " player map")
     
+    
+class TileTemplate:
+    """Used to help assemble the map. Contains coordinates and probabilities that certain types of tiles will be placed here"""
+    def __init__(self,q,r,s,allowed_types):
+        self.q = q
+        self.r = r
+        self.s = s
+        self.allowed_types = allowed_types
+    
+    def get_coordinates(self):
+        return self.q,self.r,self.s
