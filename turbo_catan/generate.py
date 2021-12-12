@@ -191,3 +191,5 @@ class CatanBoard:
     def plot(self):
         fig, ax = plot_hexes(self.tiles)
         ax.set_title(str(self.n_players) + " player map")
+
+        return fig
