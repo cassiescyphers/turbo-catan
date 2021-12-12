@@ -49,6 +49,9 @@ class CatanBoard:
         self.randomize_ring_placement = True
         self.prevent_single_edge_outer_ring_tiles = True
         
+        self.place_harbors = True
+        self.harbor_prob = 0.5
+        
     def _gen_ring(self,ring):
         '''Generates the coordinates of the specified ring number of tiles.'''
         hex_coords = []
@@ -156,7 +159,43 @@ class CatanBoard:
                     tiles.append(Tile(res,rolls[j]))
                 
         return tiles
+    
+    
+    def _place_harbors(self,tiles):
+        # count edges clockwise, starting with the top edge
         
+        oceans = [tile for tile in tiles if tile.type == TileType.ocean]
+        random.shuffle(oceans)
+        
+        n_harbors_to_place = int(len(oceans) * self.harbor_prob)
+        
+        harbor_types = list(Harbor)
+        
+        n_mult = int(n_harbors_to_place / len(harbor_types))
+        r = n_harbors_to_place - n_mult * len(harbor_types)
+        harbor_choices = harbor_types * n_mult + list(np.random.choice(harbor_types,size=r,replace=False))
+        random.shuffle(harbor_choices)
+        
+        
+        i = 0
+        while(True):
+            ocean = oceans[i]
+            i += 1
+            
+            adj_tiles = ocean.get_adjacent_tiles(tiles)
+                
+            pos_choice_list = []
+            for pos,tile in adj_tiles.items():
+                if tile.type != TileType.ocean:
+                    pos_choice_list.append(pos)
+            if len(pos_choice_list) > 0:
+                ocean.harbor_position = np.random.choice(pos_choice_list)
+                ocean.harbor = harbor_choices.pop(0)             
+                
+            if len(harbor_choices) == 0 or i == len(oceans):
+                break
+                
+      
     
     def _gen_tiles(self,n_players):
         ''' generates the tiles of a balanced map'''
@@ -215,13 +254,18 @@ class CatanBoard:
             c = coordinate_assignments[tile]
             tile.set_coordinate(c.q,c.r,c.s)
         tiles += outer_ocean_hexes
+        
+        if self.place_harbors == True:
+            self._place_harbors(tiles)
 
         self.tiles = tiles
         return tiles
     
     def plot(self):
         fig,ax = plot_hexes(self.tiles)
-        ax.set_title(str(self.n_players) + " player map")
+        ax.set_title(str(self.n_players) + " Player Map",size=24)
+        
+    
     
     
 class TileTemplate:
